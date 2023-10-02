@@ -193,3 +193,9 @@ if __name__ == "__main__":
 
     # Run
     model_training()
+
+'''
+python train_predictor.py \
+--train_set /data1/nuplan/jiale/exp/GameFormer/processed_data \
+--valid_set /data1/nuplan/jiale/exp/GameFormer/validation_data
+'''

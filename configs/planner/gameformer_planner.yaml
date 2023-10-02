@@ -1,0 +1,5 @@
+gameformer_planner:
+  _target_: nuplan.planning.simulation.planner.gameformer_planner.gameformer_planner.Planner
+  _convert_: 'all'
+  model_path: training_log/Exp1/model_epoch_20_valADE_1.9859.pth
+  device: cuda

@@ -42,8 +42,8 @@ class VectorMapEncoder(nn.Module):
 
     def segment_map(self, map, map_encoding):
         B, N_e, N_p, D = map_encoding.shape 
-        map_encoding = F.max_pool2d(map_encoding.permute(0, 3, 1, 2), kernel_size=(1, 10))
-        map_encoding = map_encoding.permute(0, 2, 3, 1).reshape(B, -1, D)
+        map_encoding = F.max_pool2d(map_encoding.permute(0, 3, 1, 2), kernel_size=(1, 10)) # (B, D, N_e, N_p//10)
+        map_encoding = map_encoding.permute(0, 2, 3, 1).reshape(B, -1, D) # (B, N_e*N_p//10, D)
 
         map_mask = torch.eq(map, 0)[:, :, :, 0].reshape(B, N_e, N_p//10, N_p//(N_p//10))
         map_mask = torch.max(map_mask, dim=-1)[0].reshape(B, -1)
@@ -124,7 +124,7 @@ class CrossTransformer(nn.Module):
     def forward(self, query, key, value, mask=None):
         attention_output, _ = self.cross_attention(query, key, value, key_padding_mask=mask)
         attention_output = self.norm_1(attention_output)
-        output = self.norm_2(self.ffn(attention_output) + attention_output)
+        output = self.norm_2(self.ffn(attention_output) + attention_output) # [batch, modal, dim]
 
         return output
 
@@ -145,7 +145,8 @@ class InitialPredictionDecoder(nn.Module):
         N = self._agents
         multi_modal_query = self.multi_modal_query_embedding(self.modal)
         agent_query = self.agent_query_embedding(self.agent)
-        query = encoding[:, :N, None] + multi_modal_query[None, :, :] + agent_query[:, None, :]
+        query = encoding[:, :N, None] + multi_modal_query[None, :, :] + agent_query[:, None, :] # [batch, agents, modal, dim]
+        # [batch, agents, modal, dim] = [batch, agents, 1, dim] + [batch, 1, modal, dim]
         query_content = torch.stack([self.query_encoder(query[:, i], encoding, encoding, mask) for i in range(N)], dim=1)
         predictions, scores = self.predictor(query_content)
         predictions[..., :2] += current_states[:, :N, None, None, :2]
@@ -172,7 +173,7 @@ class InteractionDecoder(nn.Module):
         futures = (multi_futures * scores.softmax(-1).unsqueeze(-1)).mean(dim=2)    
         
         # using self-attention to encode the interaction
-        interaction = self.interaction_encoder(futures, mask[:, :N])
+        interaction = self.interaction_encoder(futures, mask[:, :N]) # [batch, agents, dim]
         
         # append the interaction encoding to the common content
         encoding = torch.cat([interaction, encoding], dim=1)

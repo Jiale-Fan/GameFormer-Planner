@@ -1,0 +1,30 @@
+import os
+import shutil
+
+# Source folder containing files
+source_folder = "/data1/nuplan/jiale/exp/GameFormer/processed_data"
+
+# Destination folder where every one out of ten files will be moved
+destination_folder = "/data1/nuplan/jiale/exp/GameFormer/validation_data"
+
+# Ensure the destination folder exists, or create it if it doesn't
+if not os.path.exists(destination_folder):
+    os.makedirs(destination_folder)
+
+# List all files in the source folder
+files = os.listdir(source_folder)
+
+# Calculate how many files should be moved out of ten
+num_files_to_move = len(files) // 10
+
+# Iterate through the files and move every one out of ten to the destination folder
+for i, file_name in enumerate(files):
+    source_file = os.path.join(source_folder, file_name)
+    destination_file = os.path.join(destination_folder, file_name)
+
+    # Check if it's the i-th file out of every ten
+    if i % 10 == 0:
+        print(f"Moving {file_name} to {destination_folder}")
+        shutil.move(source_file, destination_file)
+
+print(f"Moved {num_files_to_move} out of {len(files)} files to {destination_folder}")

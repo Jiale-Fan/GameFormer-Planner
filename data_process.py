@@ -190,3 +190,12 @@ if __name__ == "__main__":
     del worker, builder, scenario_filter, scenario_mapping
     processor = DataProcessor(scenarios)
     processor.work(args.save_path, debug=args.debug)
+
+'''
+python data_process.py \
+--data_path $NUPLAN_DATA_ROOT/nuplan-v1.1/splits/trainval \
+--map_path $NUPLAN_MAPS_ROOT \
+--save_path $NUPLAN_EXP_ROOT/GameFormer/processed_data
+
+
+'''

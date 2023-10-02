@@ -45,9 +45,11 @@ class DrivingData(Dataset):
 
 
 def imitation_loss(gmm, scores, ground_truth):
+
+    # --- 1. 
     B, N = gmm.shape[0], gmm.shape[1]
-    distance = torch.norm(gmm[:, :, :, :, :2] - ground_truth[:, :, None, :, :2], dim=-1)
-    best_mode = torch.argmin(distance.mean(-1), dim=-1)
+    distance = torch.norm(gmm[:, :, :, :, :2] - ground_truth[:, :, None, :, :2], dim=-1) # [batch, agents, modal, timesteps]
+    best_mode = torch.argmin(distance.mean(-1), dim=-1) # [batch, modal]
 
     mu = gmm[..., :2]
     best_mode_mu = mu[torch.arange(B)[:, None, None], torch.arange(N)[None, :, None], best_mode[:, :, None]]
@@ -63,11 +65,11 @@ def imitation_loss(gmm, scores, ground_truth):
     std_x = torch.exp(log_std_x)
     std_y = torch.exp(log_std_y)
 
-    gmm_loss = log_std_x + log_std_y + 0.5 * (torch.square(dx/std_x) + torch.square(dy/std_y))
-    gmm_loss = torch.mean(gmm_loss)
+    gmm_loss = log_std_x + log_std_y + 0.5 * (torch.square(dx/std_x) + torch.square(dy/std_y)) # [batch, agents, timesteps]
+    gmm_loss = torch.mean(gmm_loss) # scalar
 
     score_loss = F.cross_entropy(scores.permute(0, 2, 1), best_mode, label_smoothing=0.2, reduction='none')
-    score_loss = score_loss * torch.ne(ground_truth[:, :, 0, 0], 0)
+    score_loss = score_loss * torch.ne(ground_truth[:, :, 0, 0], 0) # act like masks to filter out the padding
     score_loss = torch.mean(score_loss)
     
     loss = gmm_loss + score_loss

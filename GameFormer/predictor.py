@@ -19,9 +19,9 @@ class Encoder(nn.Module):
 
     def forward(self, inputs):
         # agents
-        ego = inputs['ego_agent_past']
-        neighbors = inputs['neighbor_agents_past']
-        actors = torch.cat([ego[:, None, :, :5], neighbors[..., :5]], dim=1)
+        ego = inputs['ego_agent_past'] # [batch, 21, 7]
+        neighbors = inputs['neighbor_agents_past'] # [batch, 20, 21, 7]
+        actors = torch.cat([ego[:, None, :, :5], neighbors[..., :5]], dim=1) # [batch, 21, 21, 5]
 
         # agent encoding
         encoded_ego = self.ego_encoder(ego)
@@ -38,10 +38,10 @@ class Encoder(nn.Module):
         encoded_map_crosswalks, crosswalks_mask = self.crosswalk_encoder(map_crosswalks)
 
         # attention fusion encoding
-        input = torch.cat([encoded_actors, encoded_map_lanes, encoded_map_crosswalks], dim=1)
-        mask = torch.cat([actors_mask, lanes_mask, crosswalks_mask], dim=1)
+        input = torch.cat([encoded_actors, encoded_map_lanes, encoded_map_crosswalks], dim=1) # [Batch, actors+lanes+crosswalks, dim]
+        mask = torch.cat([actors_mask, lanes_mask, crosswalks_mask], dim=1) # [Batch, actors+lanes+crosswalks]
 
-        encoding = self.fusion_encoder(input, src_key_padding_mask=mask)
+        encoding = self.fusion_encoder(input, src_key_padding_mask=mask) # [Batch, actors+lanes+crosswalks, dim] [b, 236, 256] [b, 236]
 
         # outputs
         encoder_outputs = {
@@ -68,8 +68,8 @@ class Decoder(nn.Module):
 
     def forward(self, encoder_outputs):
         decoder_outputs = {}
-        current_states = encoder_outputs['actors'][:, :, -1]
-        encoding, mask = encoder_outputs['encoding'], encoder_outputs['mask']
+        current_states = encoder_outputs['actors'][:, :, -1] # [batch, 21, 5]
+        encoding, mask = encoder_outputs['encoding'], encoder_outputs['mask'] # [batch, 236, 256] [batch, 236]
 
         # level 0 decode
         last_content, last_level, last_score = self.initial_predictor(current_states, encoding, mask)
@@ -139,8 +139,8 @@ class GameFormer(nn.Module):
 
     def forward(self, inputs):
         encoder_outputs = self.encoder(inputs)
-        route_lanes = encoder_outputs['route_lanes']
-        initial_state = encoder_outputs['actors'][:, 0, -1]
+        route_lanes = encoder_outputs['route_lanes'] # route lanes have actually not been encoded by encoder
+        initial_state = encoder_outputs['actors'][:, 0, -1] # [batch, 5]
         decoder_outputs, env_encoding = self.decoder(encoder_outputs)
         ego_plan = self.planner(env_encoding, route_lanes, initial_state)
 

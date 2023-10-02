@@ -30,6 +30,7 @@ class Planner(AbstractPlanner):
             device = torch.device('cpu')
 
         self._device = device
+        print(f'Using device: {self._device}')
     
     def name(self) -> str:
         return "GameFormer Planner"

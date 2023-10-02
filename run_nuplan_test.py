@@ -32,6 +32,9 @@ from nuplan.planning.simulation.simulation import Simulation
 from nuplan.planning.simulation.simulation_setup import SimulationSetup
 from nuplan.planning.nuboard.nuboard import NuBoard
 from nuplan.planning.nuboard.base.data_class import NuBoardFile
+from hydra import initialize, compose
+import hydra.utils
+import os
 
 
 def build_simulation_experiment_folder(output_dir, simulation_dir, metric_dir, aggregator_metric_dir):
@@ -195,7 +198,21 @@ def main(args):
     map_version = "nuplan-maps-v1.0"
     scenario_mapping = ScenarioMapping(scenario_map=get_scenario_map(), subsample_ratio_override=0.5)
     builder = NuPlanScenarioBuilder(data_root, map_root, sensor_root, db_files, map_version, scenario_mapping=scenario_mapping)
-    scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
+    # scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
+
+    #------------------------------------------------------------------
+
+    # scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
+    
+    # Instead of using the filter given with GameFormer, use test split "val14" to be consistent with the results of other models
+    with initialize(config_path="./configs"):
+    # Load the configuration file
+        cfg = compose(config_name="val14_split")
+    scenario_filter = hydra.utils.instantiate(cfg)
+
+    
+    #------------------------------------------------------------------
+
     worker = SingleMachineParallelExecutor(use_process_pool=True)
     scenarios = builder.get_scenarios(scenario_filter, worker)
     del worker, scenario_filter, scenario_mapping
@@ -211,10 +228,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run NuPlan test')
     parser.add_argument('--experiment_name', choices=['open_loop_boxes', 'closed_loop_nonreactive_agents', 
-                                                      'closed_loop_reactive_agents'], help='experiment name')
-    parser.add_argument('--data_path', type=str, help='path to data')
-    parser.add_argument('--map_path', type=str, help='path to nuplan maps')
-    parser.add_argument('--model_path', type=str, help='path to model')
+                                                      'closed_loop_reactive_agents'], help='experiment name', default='open_loop_boxes')
+    parser.add_argument('--data_path', type=str, help='path to data', default=os.environ.get('NUPLAN_DATA_ROOT')+'/nuplan-v1.1/splits/trainval')
+    parser.add_argument('--map_path', type=str, help='path to nuplan maps', default=os.environ.get('NUPLAN_MAPS_ROOT'))
+    parser.add_argument('--model_path', type=str, help='path to model', default='training_log/Exp1/model_epoch_20_valADE_1.9859.pth')
+
     parser.add_argument('--device', type=str, default='cuda', help='device to run model on')
     parser.add_argument('--scenarios_per_type', type=int, default=10, help='number of scenarios per type')
     parser.add_argument('--total_scenarios', default=None, help='limit total number of scenarios')
@@ -222,3 +240,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+'''python run_nuplan_test.py \
+--experiment_name open_loop_boxes \
+--data_path nuplan/dataset/nuplan-v1.1/splits/mini \
+--map_path nuplan/dataset/maps \
+--model_path training_log/your/model'''
