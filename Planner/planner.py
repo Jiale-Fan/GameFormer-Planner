@@ -136,18 +136,32 @@ class Planner(AbstractPlanner):
         # Construct input features
         features = observation_adapter(history, traffic_light_data, self._map_api, self._route_roadblock_ids, self._device)
 
-        # Get reference path
-        ref_path = self._get_reference_path(ego_state, traffic_light_data, observation)
+        # Get reference path; reference path is only used in trajectory refinement
+        # ref_path = self._get_reference_path(ego_state, traffic_light_data, observation) 
 
         # Infer prediction model
         with torch.no_grad():
             plan, predictions, scores, ego_state_transformed, neighbors_state_transformed = self._get_prediction(features)
+        # plan: [1, 80, 3]
+
+
+        # ---------------------------------------------------------------------------------------------------
+        # Original code
 
         # Trajectory refinement
-        with torch.no_grad():
-            plan = self._trajectory_planner.plan(ego_state, ego_state_transformed, neighbors_state_transformed, 
-                                                 predictions, plan, scores, ref_path, observation)
+
+        # with torch.no_grad():
+        #     plan = self._trajectory_planner.plan(ego_state, ego_state_transformed, neighbors_state_transformed, 
+        #                                          predictions, plan, scores, ref_path, observation)
+        # plan: [80, 3]
             
+        
+        # ---------------------------------------------------------------------------------------------------
+        # Modified code
+
+        plan = plan.squeeze(0).cpu().numpy()
+        # ---------------------------------------------------------------------------------------------------
+
         states = transform_predictions_to_states(plan, history.ego_states, self._future_horizon, DT)
         trajectory = InterpolatedTrajectory(states)
 

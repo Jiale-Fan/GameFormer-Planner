@@ -202,13 +202,17 @@ def main(args):
 
     #------------------------------------------------------------------
 
-    # scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
+    # original way of getting scenario filter
+    scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
     
+    #------------------------------------------------------------------
+    # Modified code
     # Instead of using the filter given with GameFormer, use test split "val14" to be consistent with the results of other models
-    with initialize(config_path="./configs"):
-    # Load the configuration file
-        cfg = compose(config_name="val14_split")
-    scenario_filter = hydra.utils.instantiate(cfg)
+    
+    # with initialize(config_path="./configs"):
+    # # Load the configuration file
+    #     cfg = compose(config_name="val14_split")
+    # scenario_filter = hydra.utils.instantiate(cfg)
 
     
     #------------------------------------------------------------------
@@ -235,7 +239,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--device', type=str, default='cuda', help='device to run model on')
     parser.add_argument('--scenarios_per_type', type=int, default=10, help='number of scenarios per type')
-    parser.add_argument('--total_scenarios', default=None, help='limit total number of scenarios')
+    parser.add_argument('--total_scenarios', default=8, help='limit total number of scenarios')
     parser.add_argument('--shuffle_scenarios', type=bool, default=False, help='shuffle scenarios')
     args = parser.parse_args()
 
