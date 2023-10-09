@@ -8,7 +8,8 @@ from nuplan.planning.utils.multithreading.worker_parallel import SingleMachinePa
 from nuplan.planning.scenario_builder.scenario_filter import ScenarioFilter
 from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario_builder import NuPlanScenarioBuilder
 from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario_utils import ScenarioMapping
-
+from hydra import initialize, compose
+import hydra.utils
 
 # define data processor
 class DataProcessor(object):
@@ -181,6 +182,20 @@ if __name__ == "__main__":
     db_files = None
     scenario_mapping = ScenarioMapping(scenario_map=get_scenario_map(), subsample_ratio_override=0.5)
     builder = NuPlanScenarioBuilder(args.data_path, args.map_path, sensor_root, db_files, map_version, scenario_mapping=scenario_mapping)
+    
+    #------------------------------------------------------------------
+    # Modified code
+    # Instead of using the filter given with GameFormer, use train split "train_140k" to be consistent with the results of other models
+    
+    with initialize(config_path="./configs/scenario_filter"):
+    # # Load the configuration file
+        cfg = compose(config_name="train150k_split")
+    scenario_filter = hydra.utils.instantiate(cfg)
+
+    
+    #------------------------------------------------------------------
+    
+    
     scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
     worker = SingleMachineParallelExecutor(use_process_pool=True)
     scenarios = builder.get_scenarios(scenario_filter, worker)
@@ -195,7 +210,7 @@ if __name__ == "__main__":
 python data_process.py \
 --data_path $NUPLAN_DATA_ROOT/nuplan-v1.1/splits/trainval \
 --map_path $NUPLAN_MAPS_ROOT \
---save_path $NUPLAN_EXP_ROOT/GameFormer/processed_data
+--save_path $NUPLAN_EXP_ROOT/GameFormer/processed_data_train_150k
 
 
 '''

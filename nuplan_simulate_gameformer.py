@@ -6,7 +6,7 @@ import logging
 import Planner.planner
 
 SPLIT='val14_split'
-CHALLENGE='open_loop_boxes' # open_loop_boxes, closed_loop_nonreactive_agents, closed_loop_reactive_agents
+CHALLENGE='closed_loop_reactive_agents' # open_loop_boxes, closed_loop_nonreactive_agents, closed_loop_reactive_agents
 CHECKPOINT='/data1/nuplan/jiale/exp/exp/training/training_autobots_ego_model/2023.09.26.17.43.27/checkpoints/last.ckpt'
 MODEL='autobots_model'
 
@@ -49,3 +49,6 @@ main_simulation(cfg)
 
 # hydra.searchpath="[pkg://viplan.planning.script.config.common, pkg://viplan.planning.script.config.training, pkg://viplan.planning.script.experiments, pkg://nuplan.planning.script.config.common, pkg://nuplan.planning.script.experiments]"
 # tensorboard --logdir=/data1/nuplan/jiale/exp/exp/training/training_autobots_ego_model
+
+# sshfs jiale@128.178.17.178:/home/jiale/GameFormer-Planner ./vita_jiale/GFP -ocache=no -onolocalcaches -ovolname=GameFormer-Planner
+# sshfs jiale@128.178.17.178:/home/jiale/nuplan-devkit ./vita_jiale/nuplan -ocache=no -onolocalcaches -ovolname=nuplan-devkit
