@@ -5,7 +5,39 @@ import random
 import numpy as np
 from torch.utils.data import Dataset
 from torch.nn import functional as F
+import pickle
+from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario import NuPlanScenario
+import os
+from torch.utils.data.dataloader import default_collate
 
+def driving_data_and_scenario_collate(batch):
+
+    scenario_data = [list(entry).pop() for entry in batch]
+    batch_array = [entry[:-1] for entry in batch]
+    array_data = default_collate(batch_array)
+    return [array_data, scenario_data]
+
+class DrivingDataAndScenario(Dataset):
+    def __init__(self, data_dir, n_neighbors):
+        self.np_data_list = glob.glob(data_dir+"/*.npz")
+        self.scenario_data_list = [os.path.join(os.path.join(os.path.dirname(f), os.path.splitext(os.path.basename(f))[0]+'.pkl')) for f in self.np_data_list]
+        self._n_neighbors = n_neighbors
+
+    def __len__(self):
+        return len(self.np_data_list)
+
+    def __getitem__(self, idx):
+        data = np.load(self.np_data_list[idx])
+        ego = data['ego_agent_past']
+        neighbors = data['neighbor_agents_past']
+        route_lanes = data['route_lanes'] 
+        map_lanes = data['lanes']
+        map_crosswalks = data['crosswalks']
+        ego_future_gt = data['ego_agent_future']
+        neighbors_future_gt = data['neighbor_agents_future'][:self._n_neighbors]
+        scenario = pickle.loads(open(self.scenario_data_list[idx], 'rb').read())
+
+        return ego, neighbors, map_lanes, map_crosswalks, route_lanes, ego_future_gt, neighbors_future_gt, scenario
 
 def initLogging(log_file: str, level: str = "INFO"):
     logging.basicConfig(filename=log_file, filemode='w',

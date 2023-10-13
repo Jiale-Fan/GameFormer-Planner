@@ -10,6 +10,7 @@ from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario_builder import N
 from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario_utils import ScenarioMapping
 from hydra import initialize, compose
 import hydra.utils
+import pickle
 
 # define data processor
 class DataProcessor(object):
@@ -160,7 +161,11 @@ class DataProcessor(object):
 
             # save to disk
             self.save_to_disk(save_dir, data)
-            
+
+    def save_scenario(self, save_dir, debug=False):
+        for scenario in tqdm(self._scenarios):
+            pickle.dump(scenario, open(f"{save_dir}/{scenario._map_name}_{scenario.token}.pkl", "wb"))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Data Processing')
@@ -204,8 +209,13 @@ if __name__ == "__main__":
     # process data
     del worker, builder, scenario_filter, scenario_mapping
     processor = DataProcessor(scenarios)
-    processor.work(args.save_path, debug=args.debug)
 
+    # processor.work(args.save_path, debug=args.debug)
+    processor.save_scenario(args.save_path, debug=args.debug)
+
+
+
+# !! NOTE this script only saves scenario objects now 
 '''
 python data_process.py \
 --data_path $NUPLAN_DATA_ROOT/nuplan-v1.1/splits/trainval \
