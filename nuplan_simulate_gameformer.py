@@ -6,7 +6,7 @@ import logging
 import Planner.planner
 
 SPLIT='val14_split'
-CHALLENGE='closed_loop_reactive_agents' # open_loop_boxes, closed_loop_nonreactive_agents, closed_loop_reactive_agents
+CHALLENGE='closed_loop_nonreactive_agents' # open_loop_boxes, closed_loop_nonreactive_agents, closed_loop_reactive_agents
 CHECKPOINT='/data1/nuplan/jiale/exp/exp/training/training_autobots_ego_model/2023.09.26.17.43.27/checkpoints/last.ckpt'
 MODEL='autobots_model'
 
