@@ -53,6 +53,7 @@ from nuplan.planning.simulation.observation.observation_type import Observation
 from nuplan.planning.simulation.trajectory.abstract_trajectory import AbstractTrajectory
 import torch
 
+count_no_route = 0
 
 class MetricsComputer(AbstractPDMPlanner):
     """
@@ -81,7 +82,7 @@ class MetricsComputer(AbstractPDMPlanner):
         trajectory_list = np.split(trajectories, trajectories.shape[0])
         metrics_list = [self.compute_metrics(trajectory, scenario) for trajectory, scenario in zip(trajectory_list, scenarios)]
         mean_metrics = np.mean(metrics_list)
-        return mean_metrics
+        return mean_metrics, metrics_list
 
     def compute_metrics(self, trajectory: torch.Tensor, scenario: NuPlanScenario) -> np.float64:
         self._map_api = scenario.map_api
@@ -102,7 +103,11 @@ class MetricsComputer(AbstractPDMPlanner):
 
         # prepare route dicts
         self._load_route_dicts(scenario._route_roadblock_ids)
-        self._route_lane_dict # should be ready now
+        if len(self._route_lane_dict) == 0:
+            global count_no_route
+            count_no_route += 1
+            print("No route lane dict found: " + str(count_no_route))
+            return np.array([0.0])
 
         # prepare observation
         trajectory_sampling = TrajectorySampling(num_poses=80, interval_length=0.1)
@@ -123,13 +128,17 @@ class MetricsComputer(AbstractPDMPlanner):
         centerline_discrete_path = self._get_discrete_centerline(current_lane)
         _centerline = PDMPath(centerline_discrete_path)
 
-        # TODO add simulator?
-        new_dim_traj = np.zeros((trajectory.shape[0], trajectory.shape[1]+1, 11))
-        new_dim_traj[:, :-1, :3] = trajectory.cpu().detach().numpy()
-        simulated_proposals_array = self._simulator.simulate_proposals(
-            new_dim_traj, ego_state
+        # get simulated proposal
+        proposals_array = np.zeros((trajectory.shape[0], trajectory.shape[1]+1, 11))
+        proposals_array[:, 1:, :3] = coordinates_transform(trajectory.cpu().detach().numpy(), ego_state)
+        # proposal must be in universal coordinates
+        proposals_array[:, 0, :3] = np.array([ego_state.rear_axle.x, ego_state.rear_axle.y, ego_state.rear_axle.heading])
+
+        simulated_proposals_array = self._simulator.simulate_proposals( # Simulation uncorrect, maybe coordinates inconsistency
+            proposals_array, ego_state
         ) # [15, 41, 11]
-        new_dim_traj[:, -1, :3] = simulated_proposals_array[:, -1, :3]
+
+        # TODO DEBUG tracking performance
 
         proposal_scores = self._scorer.score_proposals(
                     simulated_proposals_array, # TODO: check dimensions
@@ -142,6 +151,7 @@ class MetricsComputer(AbstractPDMPlanner):
                     )
 
         return proposal_scores
+
 
 
     # fake methods
@@ -172,3 +182,17 @@ class MetricsComputer(AbstractPDMPlanner):
         :return: Trajectories representing the predicted ego's position in future
         """
         pass
+
+def coordinates_transform(proposal: npt.NDArray, ego_state: EgoState):
+    '''
+    Transform proposal from ego coordinates to universal coordinates
+    '''
+    ego_state_array = np.array([ego_state.rear_axle.x, ego_state.rear_axle.y, ego_state.rear_axle.heading])
+    theta = ego_state.rear_axle.heading
+    rotation_mat = np.array([[np.cos(theta), np.sin(theta)],
+                             [-np.sin(theta), np.cos(theta)]])
+    new_proposal = np.zeros(proposal.shape)
+    new_proposal[..., :2] = np.matmul(proposal[..., :2], rotation_mat)
+    new_proposal[..., :2] += ego_state_array[:2]
+    new_proposal[..., 2] = proposal[..., 2] + theta
+    return new_proposal

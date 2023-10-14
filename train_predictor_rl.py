@@ -9,7 +9,7 @@ from GameFormer.predictor import GameFormer
 from torch.utils.data import DataLoader
 from GameFormer.train_utils import *
 from GameFormer.metrics_computer import *
-from torch.utils.data.dataloader import default_collate
+
 
 def train_epoch(data_loader, model, optimizer):
     epoch_loss = []
@@ -50,15 +50,17 @@ def train_epoch(data_loader, model, optimizer):
             ## metrics-based RL loss function
 
             mc = MetricsComputer()
-            loss = mc.compute_metrics_batch(ego_plan, scenarios)
+            loss, loss_list = mc.compute_metrics_batch(ego_plan, scenarios)
 
             mc = MetricsComputer()
-            loss_expert = mc.compute_metrics_batch(ego_future, scenarios)
+            loss_expert, loss_exp_list = mc.compute_metrics_batch(ego_future, scenarios)
+            print("loss: ", loss, "loss_expert: ", loss_expert)
 
             # loss backward
-            loss.backward() # loss backward will NOT work because metrics calculation is done in numpy
-            nn.utils.clip_grad_norm_(model.parameters(), 5)
-            optimizer.step()
+
+            # loss.backward() # loss backward will NOT work because metrics calculation is done in numpy
+            # nn.utils.clip_grad_norm_(model.parameters(), 5)
+            # optimizer.step()
 
             # compute metrics
             metrics = motion_metrics(ego_plan, prediction, ego_future, neighbors_future, neighbors_future_valid)
