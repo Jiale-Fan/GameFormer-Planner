@@ -37,7 +37,7 @@ class DataProcessor(object):
 
         self._target_speed = 13.0 # [m/s]
         self._max_path_length = 50 # [m]
-        self.proposals_num = 12
+        self.proposals_num = 32
         self.subsampling_ratio = 10
 
     def get_ego_agent(self):
@@ -253,7 +253,7 @@ class DataProcessor(object):
         return stacked_paths
 
     def work(self, save_dir, debug=False):
-        for scenario in tqdm(self._scenarios[:10]):
+        for scenario in tqdm(self._scenarios):
             map_name = scenario._map_name
             token = scenario.token
             self.scenario: NuPlanScenario = scenario
@@ -330,7 +330,7 @@ if __name__ == "__main__":
     #------------------------------------------------------------------
     
     
-    scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
+    # scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
     worker = SingleMachineParallelExecutor(use_process_pool=True)
     scenarios = builder.get_scenarios(scenario_filter, worker)
     print(f"Total number of scenarios: {len(scenarios)}")
@@ -340,7 +340,7 @@ if __name__ == "__main__":
     processor = DataProcessor(scenarios)
 
     # processor.work(args.save_path, debug=args.debug)
-    processor.work(args.save_path, debug=True)
+    processor.work(args.save_path, debug=False)
     # processor.work_save_scenario(args.save_path, debug=args.debug)
 
 
@@ -350,7 +350,7 @@ if __name__ == "__main__":
 python data_process.py \
 --data_path $NUPLAN_DATA_ROOT/nuplan-v1.1/splits/trainval \
 --map_path $NUPLAN_MAPS_ROOT \
---save_path $NUPLAN_EXP_ROOT/GameFormer/processed_data_proposals_test
+--save_path $NUPLAN_EXP_ROOT/GameFormer/processed_data_proposals_train
 
 
 '''

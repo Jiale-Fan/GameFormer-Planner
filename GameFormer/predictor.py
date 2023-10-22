@@ -56,7 +56,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, neighbors=10, modalities=12, levels=3):
+    def __init__(self, neighbors=10, modalities=6, levels=3):
         super(Decoder, self).__init__()
         self.levels = levels
         future_encoder = FutureEncoder()
@@ -132,7 +132,7 @@ class NeuralPlanner(nn.Module):
     
     
 class GameFormer(nn.Module):
-    def __init__(self, encoder_layers=6, decoder_levels=3, modalities=12, neighbors=10):
+    def __init__(self, encoder_layers=6, decoder_levels=3, modalities=32, neighbors=10):
         super(GameFormer, self).__init__()
         self.encoder = Encoder(layers=encoder_layers)
         self.decoder = Decoder(neighbors, modalities, decoder_levels)

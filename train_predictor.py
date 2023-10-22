@@ -27,6 +27,8 @@ def train_epoch(data_loader, model, optimizer):
                 'path_proposals': batch[7].to(args.device).type(torch.float32)
             }
 
+            valid_proposal_mask = torch.ne(inputs['path_proposals'][:, :, 0, -1], 0) # [batch, modal]
+
             ego_future = batch[5].to(args.device)
             neighbors_future = batch[6].to(args.device)
             neighbors_future_valid = torch.ne(neighbors_future[..., :2], 0)
@@ -34,7 +36,8 @@ def train_epoch(data_loader, model, optimizer):
             # call the mdoel
             optimizer.zero_grad()
             level_k_outputs, ego_plan = model(inputs)
-            loss, results = level_k_loss(level_k_outputs, ego_future, neighbors_future, neighbors_future_valid)
+            # level_k_outputs interactions: [batch, agents, modal, timesteps, 4], scores: [batch, agents, modal]
+            loss, results = level_k_loss(level_k_outputs, ego_future, neighbors_future, neighbors_future_valid, valid_proposal_mask)
             prediction = results[:, 1:]
             plan_loss = planning_loss(ego_plan, ego_future)
             loss += plan_loss
@@ -77,8 +80,10 @@ def valid_epoch(data_loader, model):
                 'map_lanes': batch[2].to(args.device),
                 'map_crosswalks': batch[3].to(args.device),
                 'route_lanes': batch[4].to(args.device),
-                'path_proposals': batch[7].to(args.device)
+                'path_proposals': batch[7].to(args.device).type(torch.float32)
             }
+
+            valid_proposal_mask = torch.ne(inputs['path_proposals'][:, :, 0, -1], 0) # [batch, modal]
 
             ego_future = batch[5].to(args.device)
             neighbors_future = batch[6].to(args.device)
@@ -87,7 +92,7 @@ def valid_epoch(data_loader, model):
             # call the mdoel
             with torch.no_grad():
                 level_k_outputs, ego_plan = model(inputs)
-                loss, results = level_k_loss(level_k_outputs, ego_future, neighbors_future, neighbors_future_valid)
+                loss, results = level_k_loss(level_k_outputs, ego_future, neighbors_future, neighbors_future_valid, valid_proposal_mask)
                 prediction = results[:, 1:]
                 plan_loss = planning_loss(ego_plan, ego_future)
                 loss += plan_loss

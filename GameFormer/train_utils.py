@@ -77,12 +77,13 @@ class DrivingData(Dataset):
         return ego, neighbors, map_lanes, map_crosswalks, route_lanes, ego_future_gt, neighbors_future_gt, path_proposals
 
 
-def imitation_loss(gmm, scores, ground_truth):
+def imitation_loss(gmm, scores, ground_truth, valid_proposal_mask):
 
     # --- 1. 
     B, N = gmm.shape[0], gmm.shape[1]
-    distance = torch.norm(gmm[:, :, :, :, :2] - ground_truth[:, :, None, :, :2], dim=-1) # [batch, agents, modal, timesteps]
-    best_mode = torch.argmin(distance.mean(-1), dim=-1) # [batch, modal]
+    distance = torch.norm(gmm[:, :, :, :, :2] - ground_truth[:, :, None, :, :2], dim=-1).mean(-1) # [batch, agents, modal]
+    distance = torch.where(valid_proposal_mask[:,None,:], distance, torch.inf) # replace invalid proposals with inf
+    best_mode = torch.argmin(distance, dim=-1) # [batch, agents]
 
     mu = gmm[..., :2]
     best_mode_mu = mu[torch.arange(B)[:, None, None], torch.arange(N)[None, :, None], best_mode[:, :, None]]
@@ -110,10 +111,10 @@ def imitation_loss(gmm, scores, ground_truth):
     return loss, best_mode_mu, best_mode
 
 
-def level_k_loss(outputs, ego_future, neighbors_future, neighbors_future_valid):
+def level_k_loss(outputs, ego_future, neighbors_future, neighbors_future_valid, valid_proposal_mask):
     loss: torch.tensor = 0
     levels = len(outputs.keys()) // 2 
-    gt_future = torch.cat([ego_future[:, None], neighbors_future], dim=1)
+    gt_future = torch.cat([ego_future[:, None], neighbors_future], dim=1) # [batch, agents, timesteps, 3]
 
     for k in range(levels):
         trajectories = outputs[f'level_{k}_interactions']
@@ -121,7 +122,7 @@ def level_k_loss(outputs, ego_future, neighbors_future, neighbors_future_valid):
         predictions = trajectories[:, 1:] * neighbors_future_valid[:, :, None, :, 0, None]
         plan = trajectories[:, :1]
         trajectories = torch.cat([plan, predictions], dim=1)
-        il_loss, future, best_mode = imitation_loss(trajectories, scores, gt_future)
+        il_loss, future, best_mode = imitation_loss(trajectories, scores, gt_future, valid_proposal_mask)
         loss += il_loss 
 
     return loss, future
@@ -129,7 +130,7 @@ def level_k_loss(outputs, ego_future, neighbors_future, neighbors_future_valid):
 
 def planning_loss(plan, ego_future):
     loss = F.smooth_l1_loss(plan, ego_future)
-    loss += F.smooth_l1_loss(plan[:, -1], ego_future[:, -1])
+    loss += F.smooth_l1_loss(plan[:, -1], ego_future[:, -1]) # final timestep extra loss
 
     return loss
 
