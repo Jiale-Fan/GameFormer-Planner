@@ -205,7 +205,7 @@ def main(args):
     # scenario_filter = ScenarioFilter(*get_filter_parameters(args.scenarios_per_type, args.total_scenarios, args.shuffle_scenarios))
     
     # Instead of using the filter given with GameFormer, use test split "val14" to be consistent with the results of other models
-    with initialize(config_path="./configs"):
+    with initialize(config_path="./configs/scenario_filter"):
     # Load the configuration file
         cfg = compose(config_name="val14_split")
     scenario_filter = hydra.utils.instantiate(cfg)
