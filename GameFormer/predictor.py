@@ -48,14 +48,15 @@ class Encoder(nn.Module):
             'actors': actors,
             'encoding': encoding,
             'mask': mask,
-            'route_lanes': inputs['route_lanes']
+            'route_lanes': inputs['route_lanes'],
+            'path_proposals': inputs['path_proposals'] # [batch, modal, 120, 7]
         }
 
         return encoder_outputs
 
 
 class Decoder(nn.Module):
-    def __init__(self, neighbors=10, modalities=6, levels=3):
+    def __init__(self, neighbors=10, modalities=12, levels=3):
         super(Decoder, self).__init__()
         self.levels = levels
         future_encoder = FutureEncoder()
@@ -72,7 +73,7 @@ class Decoder(nn.Module):
         encoding, mask = encoder_outputs['encoding'], encoder_outputs['mask'] # [batch, 236, 256] [batch, 236]
 
         # level 0 decode
-        last_content, last_level, last_score = self.initial_predictor(current_states, encoding, mask)
+        last_content, last_level, last_score = self.initial_predictor(current_states, encoding, mask, encoder_outputs['path_proposals'])
         decoder_outputs['level_0_interactions'] = last_level
         decoder_outputs['level_0_scores'] = last_score
         
@@ -131,7 +132,7 @@ class NeuralPlanner(nn.Module):
     
     
 class GameFormer(nn.Module):
-    def __init__(self, encoder_layers=6, decoder_levels=3, modalities=6, neighbors=10):
+    def __init__(self, encoder_layers=6, decoder_levels=3, modalities=12, neighbors=10):
         super(GameFormer, self).__init__()
         self.encoder = Encoder(layers=encoder_layers)
         self.decoder = Decoder(neighbors, modalities, decoder_levels)

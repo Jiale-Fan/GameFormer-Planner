@@ -22,6 +22,9 @@ class Planner(AbstractPlanner):
         self._N_points = int(T/DT)
         self._model_path = model_path
 
+        self.proposals_num = 12
+        self.subsampling_ratio = 10
+
         if device is None:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         elif device == 'cuda' and torch.cuda.is_available():
@@ -122,6 +125,86 @@ class Planner(AbstractPlanner):
         
         return ref_path.astype(np.float32)
 
+    def _get_path_proposals(self, ego_state, traffic_light_data, observation, device):
+        '''
+        get all possible path proposals (modified from _get_reference_path)
+        '''
+        solution_exists = True # assume to be true
+
+        # Get starting block
+        starting_block = None
+        min_target_speed = 3
+        max_target_speed = 15
+        cur_point = (ego_state.rear_axle.x, ego_state.rear_axle.y)
+        closest_distance = math.inf
+
+        for block in self._route_roadblocks:
+            for edge in block.interior_edges:
+                distance = edge.polygon.distance(Point(cur_point))
+                if distance < closest_distance:
+                    starting_block = block
+                    closest_distance = distance
+
+            if np.isclose(closest_distance, 0):
+                break
+            
+        # In case the ego vehicle is not on the route, return None
+        if closest_distance > 5:
+            solution_exists = False
+
+        # Get reference path, handle exception
+        try:
+            ref_paths = self._path_planner.plan_path_proposals(ego_state, starting_block, observation)
+        except:
+            solution_exists = False
+
+        if not solution_exists:
+            return np.zeros((self.proposals_num, 1200//self.subsampling_ratio, 7))
+        
+        # ref_path = self.post_process(optimal_path, ego_state)
+
+        annotated_paths = []
+        for ref_path_tuple in ref_paths:
+            ref_path = self._path_planner.post_process(ref_path_tuple[0], ego_state)
+            # Annotate red light to occupancy
+            occupancy = np.zeros(shape=(ref_path.shape[0], 1))
+            for data in traffic_light_data:
+                id_ = str(data.lane_connector_id)
+                if data.status == TrafficLightStatusType.RED and id_ in self._candidate_lane_edge_ids:
+                    lane_conn = self._map_api.get_map_object(id_, SemanticMapLayer.LANE_CONNECTOR)
+                    conn_path = lane_conn.baseline_path.discrete_path
+                    conn_path = np.array([[p.x, p.y] for p in conn_path])
+                    red_light_lane = transform_to_ego_frame(conn_path, ego_state)
+                    occupancy = annotate_occupancy(occupancy, ref_path, red_light_lane)
+
+            # Annotate max speed along the reference path
+            target_speed = starting_block.interior_edges[0].speed_limit_mps or self._target_speed
+            target_speed = np.clip(target_speed, min_target_speed, max_target_speed)
+            max_speed = annotate_speed(ref_path, target_speed)
+
+            # Finalize reference path
+            ref_path = np.concatenate([ref_path, max_speed, occupancy], axis=-1) # [x, y, theta, k, v_max, occupancy]
+            if len(ref_path) < MAX_LEN * 10:
+                ref_path = np.append(ref_path, np.repeat(ref_path[np.newaxis, -1], MAX_LEN*10-len(ref_path), axis=0), axis=0)
+
+            annotated_paths.append(ref_path.astype(np.float32))
+
+
+        stacked_paths = np.stack(annotated_paths[:self.proposals_num], axis=0) # [num_paths, 1200, 6]
+        # TODO subsample the path proposals
+        stacked_paths = stacked_paths[:, ::self.subsampling_ratio, :] # [num_paths, 120, 6]
+        # extend feature dimension as valid mask
+        stacked_paths = np.concatenate([stacked_paths, np.ones((stacked_paths.shape[0], stacked_paths.shape[1], 1))], axis=-1)
+        # pad to proposals number
+        if stacked_paths.shape[0] < self.proposals_num:
+            stacked_paths = np.concatenate([stacked_paths, np.zeros((self.proposals_num-stacked_paths.shape[0], stacked_paths.shape[1], stacked_paths.shape[2]))], axis=0)
+        
+        stacked_paths=stacked_paths[None, ...] # [1, num_paths, 120, 7] unsqueeze batch dimension
+
+        path_tensor = torch.from_numpy(stacked_paths).to(device)
+
+        return path_tensor
+
     def _get_prediction(self, features):
         predictions, plan = self._model(features)
         K = len(predictions) // 2 - 1
@@ -138,6 +221,9 @@ class Planner(AbstractPlanner):
 
         # Get reference path; reference path is only used in trajectory refinement
         # ref_path = self._get_reference_path(ego_state, traffic_light_data, observation) 
+
+        path_proposals = self._get_path_proposals(ego_state, traffic_light_data, observation, self._device)
+        features['path_proposals'] = path_proposals
 
         # Infer prediction model
         with torch.no_grad():
@@ -159,7 +245,7 @@ class Planner(AbstractPlanner):
         # ---------------------------------------------------------------------------------------------------
         # Modified code
 
-        plan = plan.squeeze(0).cpu().numpy()
+        # plan = plan.squeeze(0).cpu().numpy()
         # ---------------------------------------------------------------------------------------------------
 
         states = transform_predictions_to_states(plan, history.ego_states, self._future_horizon, DT)

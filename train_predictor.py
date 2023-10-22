@@ -23,7 +23,8 @@ def train_epoch(data_loader, model, optimizer):
                 'neighbor_agents_past': batch[1].to(args.device),
                 'map_lanes': batch[2].to(args.device),
                 'map_crosswalks': batch[3].to(args.device),
-                'route_lanes': batch[4].to(args.device)
+                'route_lanes': batch[4].to(args.device),
+                'path_proposals': batch[7].to(args.device).type(torch.float32)
             }
 
             ego_future = batch[5].to(args.device)
@@ -75,7 +76,8 @@ def valid_epoch(data_loader, model):
                 'neighbor_agents_past': batch[1].to(args.device),
                 'map_lanes': batch[2].to(args.device),
                 'map_crosswalks': batch[3].to(args.device),
-                'route_lanes': batch[4].to(args.device)
+                'route_lanes': batch[4].to(args.device),
+                'path_proposals': batch[7].to(args.device)
             }
 
             ego_future = batch[5].to(args.device)

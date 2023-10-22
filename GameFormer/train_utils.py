@@ -72,8 +72,9 @@ class DrivingData(Dataset):
         map_crosswalks = data['crosswalks']
         ego_future_gt = data['ego_agent_future']
         neighbors_future_gt = data['neighbor_agents_future'][:self._n_neighbors]
+        path_proposals = data['path_proposals']
 
-        return ego, neighbors, map_lanes, map_crosswalks, route_lanes, ego_future_gt, neighbors_future_gt
+        return ego, neighbors, map_lanes, map_crosswalks, route_lanes, ego_future_gt, neighbors_future_gt, path_proposals
 
 
 def imitation_loss(gmm, scores, ground_truth):

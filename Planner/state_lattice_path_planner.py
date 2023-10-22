@@ -52,7 +52,7 @@ class LatticePlanner:
         candidate_paths = {k: v for k, v in candidate_paths.items() if v[0] >= acceptable_path_len}
 
         # sort paths by distance to ego
-        candidate_paths = sorted(candidate_paths.items(), key=lambda x: x[1][1])
+        candidate_paths = sorted(candidate_paths.items(), key=lambda x: x[1][1]) # NOTE
 
         return candidate_paths
 
@@ -73,6 +73,23 @@ class LatticePlanner:
             edges.append(starting_block.interior_edges[np.argmin(edges_distance)])
 
         return edges
+
+    def plan_path_proposals(self, ego_state, starting_block, observation):
+        # Get candidate paths
+        edges = self.get_candidate_edges(starting_block, ego_state)
+        candidate_paths = self.get_candidate_paths(edges)
+
+        if candidate_paths is None:
+            return None
+
+        # Generate paths using state lattice
+        paths = self.generate_paths(ego_state, candidate_paths)
+
+        # Post-process the path
+        # ref_path = self.post_process(path[0], ego_state)
+
+        return paths
+
 
     def plan(self, ego_state, starting_block, observation, traffic_light_data):
         # Get candidate paths

@@ -134,19 +134,44 @@ class InitialPredictionDecoder(nn.Module):
         super(InitialPredictionDecoder, self).__init__()
         self._modalities = modalities
         self._agents = neighbors + 1
-        self.multi_modal_query_embedding = nn.Embedding(modalities, dim)
+
+        # self.modal_positional_embedding = nn.Embedding(modalities, dim) # Keep
+        # self.multi_modal_query_embedding = nn.Sequential(nn.Linear(120*6, 512), nn.ReLU(), nn.Linear(512, dim)) # TODO Substitute MLP with LSTM
+        self.multi_modal_query_embedding = nn.LSTM(input_size=6, hidden_size=256, num_layers=2, batch_first=True, dtype=torch.float32)
+
         self.agent_query_embedding = nn.Embedding(self._agents, dim)
         self.query_encoder = CrossTransformer()
         self.predictor = GMMPredictor()
         self.register_buffer('modal', torch.arange(modalities).long())
         self.register_buffer('agent', torch.arange(self._agents).long())
 
-    def forward(self, current_states, encoding, mask):
+    def forward(self, current_states, encoding, mask, proposals):
+        '''
+        proposals: [batch, modal, 120, 7]
+        '''
         N = self._agents
-        multi_modal_query = self.multi_modal_query_embedding(self.modal)
+
+        proposals_valid = proposals[..., :-1] # peel off the valid mask TODO: check if this is correct
+        # proposals_valid = proposals_valid.reshape(proposals_valid.shape[0], proposals_valid.shape[1], -1) # [batch, modal, 120*6]
+
+        proposals_valid = proposals_valid.reshape(-1, proposals_valid.shape[2], proposals_valid.shape[3]) # [batch, modal, 120, 6]
+
+        # if using linear embedding
+        # multi_modal_query = self.multi_modal_query_embedding(proposals_valid) # [batch, modal, dim]
+
+        # if using LSTM embedding
+        multi_modal_query, _ = self.multi_modal_query_embedding(proposals_valid)
+        multi_modal_query = multi_modal_query[:, -1, :].view(-1, self._modalities, multi_modal_query.shape[-1]) # [batch, 12, 256]
+
         agent_query = self.agent_query_embedding(self.agent)
-        query = encoding[:, :N, None] + multi_modal_query[None, :, :] + agent_query[:, None, :] # [batch, agents, modal, dim]
-        # [batch, agents, modal, dim] = [batch, agents, 1, dim] + [batch, 1, modal, dim]
+
+        # TODO once the order of path proposals are fixed, add the positional embedding to the proposals
+        # multi_positional_embedding = self.modal_positional_embedding(self.modal) # [6, 256] [modal, dim]
+        # # query = encoding[:, :N, None] + multi_positional_embedding[None, :, :] + multi_modal_query[:, None, :, :] + agent_query[:, None, :] # [batch, agents, modal, dim]
+       
+        query = encoding[:, :N, None] + multi_modal_query[:, None, :, :] + agent_query[:, None, :] # [batch, agents, modal, dim]
+
+        # [batch, agents, modal, dim]
         query_content = torch.stack([self.query_encoder(query[:, i], encoding, encoding, mask) for i in range(N)], dim=1)
         predictions, scores = self.predictor(query_content)
         predictions[..., :2] += current_states[:, :N, None, None, :2]

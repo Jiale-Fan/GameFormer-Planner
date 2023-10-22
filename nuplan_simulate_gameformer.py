@@ -44,7 +44,10 @@ cfg = hydra.compose(config_name=CONFIG_NAME, overrides=[
 main_simulation(cfg)
 
 
-
+'''
+Note that this script runs the model in the nuplan folder! 
+Modifications only in gameformer folder will not have effects.
+'''
 
 
 # hydra.searchpath="[pkg://viplan.planning.script.config.common, pkg://viplan.planning.script.config.training, pkg://viplan.planning.script.experiments, pkg://nuplan.planning.script.config.common, pkg://nuplan.planning.script.experiments]"
